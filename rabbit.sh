@@ -17,7 +17,7 @@ case "$1" in
         start_or_run
         ;;
     stop)
-        echo "Stopping Peril RabbitMQ container..."
+        echo "Stopping Peril RabbitMQ container..."docker s
         docker stop peril_rabbitmq
         ;;
     logs)
