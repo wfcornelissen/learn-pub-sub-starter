@@ -57,7 +57,7 @@ func (gs *GameState) CommandMove(words []string) (ArmyMove, error) {
 		return ArmyMove{}, errors.New("usage: move <location> <unitID> <unitID> <unitID> etc")
 	}
 	newLocation := Location(words[1])
-	locations := getAllLocations()
+	locations := GetAllLocations()
 	if _, ok := locations[newLocation]; !ok {
 		return ArmyMove{}, fmt.Errorf("error: %s is not a valid location", newLocation)
 	}

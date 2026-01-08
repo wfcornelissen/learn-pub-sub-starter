@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
@@ -40,6 +41,78 @@ func main() {
 		qtpe)
 
 	ngs := gamelogic.NewGameState(userName)
+loop:
+	for true {
+		cmd := gamelogic.GetInput()
+		if len(cmd) == 0 {
+			continue
+		}
+		switch strings.ToLower(cmd[0]) {
+		case "spawn":
+			//Validate length
+			if len(cmd) < 3 {
+				fmt.Println("Invalid command")
+				continue loop
+			}
+			// Validate location
+			locationBool := false
+			for location := range gamelogic.GetAllLocations() {
+				if cmd[1] == string(location) {
+					locationBool = true
+				}
+			}
+			// Validate unit
+			unitBool := false
+			for unit := range gamelogic.GetAllRanks() {
+				if cmd[2] == string(unit) {
+					unitBool = true
+				}
+			}
+			// Continue loop if validation fails
+			if !unitBool {
+				fmt.Println("Invalid unit")
+				continue loop
+			}
+			if !locationBool {
+				fmt.Println("Invalid location")
+				continue loop
+			}
+
+			err = ngs.CommandSpawn(cmd[1:])
+			if err != nil {
+				fmt.Printf("Error spawning unit:/\n%v\n", err)
+			}
+		case "move":
+			//Validate length
+			if len(cmd) < 3 {
+				fmt.Println("Invalid command")
+				continue loop
+			}
+			// Validate location
+			locationBool := false
+			for location := range gamelogic.GetAllLocations() {
+				if cmd[1] == string(location) {
+					locationBool = true
+				}
+			}
+			// Validate unit
+			unitBool := false
+			for unit := range gamelogic.GetAllRanks() {
+				if cmd[2] == string(unit) {
+					unitBool = true
+				}
+			}
+			// Continue loop if validation fails
+			if !unitBool {
+				fmt.Println("Invalid unit")
+				continue loop
+			}
+			if !locationBool {
+				fmt.Println("Invalid location")
+				continue loop
+			}
+		}
+	}
 
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt)
