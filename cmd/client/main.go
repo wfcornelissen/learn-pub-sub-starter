@@ -42,12 +42,20 @@ func main() {
 		qtpe)
 
 	ngs := gamelogic.NewGameState(userName)
+
+	err = pubsub.SubscribeJSON(conn, routing.ExchangePerilDirect, fmt.Sprintf("pause.%v", userName), routing.PauseKey, pubsub.SimpleQueueType{Transient: true}, handlerPause(ngs))
+	if err != nil {
+		fmt.Printf("Error subscribing to pause messages:\n%v\n", err)
+		return
+	}
+
 loop:
 	for true {
 		cmd := gamelogic.GetInput()
 		if len(cmd) == 0 {
 			continue
 		}
+
 		switch strings.ToLower(cmd[0]) {
 		case "spawn":
 			//Validate length
@@ -116,12 +124,10 @@ loop:
 
 			// Validation passed. Make move
 			_, err = ngs.CommandMove(cmd)
-			if !locationBool {
-				fmt.Println("Move failed")
+			if err != nil {
+				fmt.Printf("Move failed: %v\n", err)
 				continue loop
 			}
-			fmt.Printf("Unit %v moved to %v\n", unitID, cmd[1])
-			continue
 		case "status":
 			ngs.CommandStatus()
 			continue loop
@@ -151,6 +157,5 @@ func handlerPause(gs *gamelogic.GameState) func(routing.PlayingState) {
 	return func(rps routing.PlayingState) {
 		defer fmt.Print("> ")
 		gs.HandlePause(rps)
-		return
 	}
 }

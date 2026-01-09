@@ -88,19 +88,18 @@ func SubscribeJSON[T any](
 
 	go func() {
 		for delivery := range deliveries {
-			err := json.Unmarshal(delivery.Body, T)
+			var msg T
+			err := json.Unmarshal(delivery.Body, &msg)
 			if err != nil {
-				return fmt.Errorf("Error retrieving delivery structs:\n%v\n", err)
+				fmt.Printf("Error retrieving delivery structs:\n%v\n", err)
 			}
-			handler(T)
+			handler(msg)
 			err = delivery.Ack(false)
 			if err != nil {
-				return fmt.Errorf("Failed to acknowledge delivery:\n%v\n", err)
+				fmt.Printf("Failed to acknowledge delivery:\n%v\n", err)
 			}
 		}
 	}()
-	
+	return nil
 
 }
-
-func (c *amqp.Delivery)deliveryRanger
