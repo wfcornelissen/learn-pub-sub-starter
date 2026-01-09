@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
@@ -78,7 +79,7 @@ loop:
 				continue loop
 			}
 
-			err = ngs.CommandSpawn(cmd[1:])
+			err = ngs.CommandSpawn(cmd)
 			if err != nil {
 				fmt.Printf("Error spawning unit:/\n%v\n", err)
 			}
@@ -96,21 +97,47 @@ loop:
 				}
 			}
 			// Validate unit
-			unitBool := false
-			for unit := range gamelogic.GetAllRanks() {
-				if cmd[2] == string(unit) {
-					unitBool = true
-				}
+			unitID, err := strconv.Atoi(cmd[2])
+			if err != nil {
+				fmt.Println("Invalid unit id for conversion")
+				continue loop
 			}
+
+			_, unitBool := ngs.GetUnit(unitID)
 			// Continue loop if validation fails
 			if !unitBool {
-				fmt.Println("Invalid unit")
+				fmt.Println("Invalid unit id according to GetUnit")
 				continue loop
 			}
 			if !locationBool {
 				fmt.Println("Invalid location")
 				continue loop
 			}
+
+			// Validation passed. Make move
+			_, err = ngs.CommandMove(cmd)
+			if !locationBool {
+				fmt.Println("Move failed")
+				continue loop
+			}
+			fmt.Printf("Unit %v moved to %v\n", unitID, cmd[1])
+			continue
+		case "status":
+			ngs.CommandStatus()
+			continue loop
+		case "help":
+			gamelogic.PrintClientHelp()
+			continue loop
+		case "spam":
+			fmt.Println("Spamming not allowed yet!")
+			continue loop
+		case "quit":
+			gamelogic.PrintQuit()
+			os.Exit(0)
+			break loop
+		default:
+			fmt.Println("Invalid command")
+			continue loop
 		}
 	}
 
@@ -118,4 +145,8 @@ loop:
 	signal.Notify(signalChan, os.Interrupt)
 	<-signalChan
 	fmt.Println("Shutting down")
+}
+
+func handlerPause(gs *gamelogic.GameState) func(routing.PlayingState) {
+	return func()
 }

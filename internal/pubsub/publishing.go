@@ -68,3 +68,39 @@ func DeclareAndBind(
 
 	return channel, queue, nil
 }
+
+func SubscribeJSON[T any](
+	conn *amqp.Connection,
+	exchange,
+	queueName,
+	key string,
+	queueType SimpleQueueType, // an enum to represent "durable" or "transient"
+	handler func(T),
+) error {
+	channel, _, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
+	if err != nil {
+		return fmt.Errorf("Error verifying queue existence/bind:\n%v\n", err)
+	}
+	deliveries, err := channel.Consume(queueName, "", false, false, false, false, nil)
+	if err != nil {
+		return fmt.Errorf("Error retrieving delivery structs:\n%v\n", err)
+	}
+
+	go func() {
+		for delivery := range deliveries {
+			err := json.Unmarshal(delivery.Body, T)
+			if err != nil {
+				return fmt.Errorf("Error retrieving delivery structs:\n%v\n", err)
+			}
+			handler(T)
+			err = delivery.Ack(false)
+			if err != nil {
+				return fmt.Errorf("Failed to acknowledge delivery:\n%v\n", err)
+			}
+		}
+	}()
+	
+
+}
+
+func (c *amqp.Delivery)deliveryRanger

@@ -17,7 +17,7 @@ func main() {
 	const connString = "amqp://guest:guest@localhost:5672/"
 	conn, err := amqp.Dial(connString)
 	if err != nil {
-		fmt.Printf("Failed to establish connection:/n%v/n", err)
+		fmt.Printf("Failed to establish connection:\n%v\n", err)
 		return
 	}
 	defer conn.Close()
@@ -25,13 +25,19 @@ func main() {
 
 	connChannel, err := conn.Channel()
 	if err != nil {
-		fmt.Printf("Failed to create a channel for the connection:/n%v/n", err)
+		fmt.Printf("Failed to create a channel for the connection:\n%v\n", err)
 		return
 	}
 
 	err = pubsub.PublishJSON(connChannel, routing.ExchangePerilDirect, string(routing.PauseKey), routing.PlayingState{IsPaused: true})
 	if err != nil {
-		fmt.Printf("Failed to publish:/n%v/n", err)
+		fmt.Printf("Failed to publish:\n%v\n", err)
+		return
+	}
+
+	_, _, err = pubsub.DeclareAndBind(conn, routing.ExchangePerilDirect, "game_logs", "game_logs.*", pubsub.SimpleQueueType{Durable: true})
+	if err != nil {
+		fmt.Printf("Failed to declare and bind queue:\n%v\n", err)
 		return
 	}
 

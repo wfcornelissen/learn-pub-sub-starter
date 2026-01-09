@@ -32,7 +32,7 @@ type RecognitionOfWar struct {
 
 type Location string
 
-func getAllRanks() map[UnitRank]struct{} {
+func GetAllRanks() map[UnitRank]struct{} {
 	return map[UnitRank]struct{}{
 		RankInfantry:  {},
 		RankCavalry:   {},
