@@ -148,5 +148,9 @@ loop:
 }
 
 func handlerPause(gs *gamelogic.GameState) func(routing.PlayingState) {
-	return func()
+	return func(rps routing.PlayingState) {
+		defer fmt.Print("> ")
+		gs.HandlePause(rps)
+		return
+	}
 }
