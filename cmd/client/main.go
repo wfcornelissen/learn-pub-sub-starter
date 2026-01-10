@@ -43,11 +43,29 @@ func main() {
 
 	ngs := gamelogic.NewGameState(userName)
 
-	err = pubsub.SubscribeJSON(conn, routing.ExchangePerilDirect, fmt.Sprintf("pause.%v", userName), routing.PauseKey, pubsub.SimpleQueueType{Transient: true}, handlerPause(ngs))
+	err = pubsub.SubscribeJSON(
+		conn,
+		routing.ExchangePerilDirect,
+		fmt.Sprintf("pause.%v", userName),
+		routing.PauseKey,
+		pubsub.SimpleQueueType{Transient: true},
+		handlerPause(ngs))
 	if err != nil {
 		fmt.Printf("Error subscribing to pause messages:\n%v\n", err)
 		return
 	}
+
+	err = pubsub.SubscribeJSON[gamelogic.ArmyMove](
+		conn,
+		routing.ExchangePerilTopic,
+		fmt.Sprintf("army_moves.%v", userName),
+		"army_moves.*",
+		pubsub.SimpleQueueType{Transient: true},
+		func(gamelogic.ArmyMove) {
+			ngs.HandleMove()
+			return
+		},
+	)
 
 loop:
 	for true {
