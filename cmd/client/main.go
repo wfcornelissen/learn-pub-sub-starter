@@ -29,17 +29,19 @@ func main() {
 		fmt.Printf("Error retrieving welcome message:/\n%v\n", err)
 	}
 
-	qtpe, err := pubsub.CreateQueueType("transient")
-	if err != nil {
-		fmt.Printf("Error creating queue type:/\n%v\n", err)
-	}
-
 	_, _, err = pubsub.DeclareAndBind(
 		conn,
 		routing.ExchangePerilDirect,
 		fmt.Sprintf("%v.%v", routing.PauseKey, userName),
 		routing.PauseKey,
-		qtpe)
+		pubsub.Transient,
+	)
+
+	publishChan, err := conn.Channel()
+	if err != nil {
+		fmt.Printf("Failed to create publish channel:\n%v\n", err)
+		return
+	}
 
 	ngs := gamelogic.NewGameState(userName)
 
@@ -48,22 +50,34 @@ func main() {
 		routing.ExchangePerilDirect,
 		fmt.Sprintf("pause.%v", userName),
 		routing.PauseKey,
-		pubsub.SimpleQueueType{Transient: true},
-		handlerPause(ngs))
+		pubsub.Transient,
+		func(ngs gamelogic.GameState) pubsub.AckType {
+			_ = handlerPause(&ngs)
+			return pubsub.AckType(1)
+		},
+	)
 	if err != nil {
 		fmt.Printf("Error subscribing to pause messages:\n%v\n", err)
 		return
 	}
 
-	err = pubsub.SubscribeJSON[gamelogic.ArmyMove](
+	err = pubsub.SubscribeJSON(
 		conn,
 		routing.ExchangePerilTopic,
-		fmt.Sprintf("army_moves.%v", userName),
-		"army_moves.*",
-		pubsub.SimpleQueueType{Transient: true},
-		func(gamelogic.ArmyMove) {
-			ngs.HandleMove()
-			return
+		fmt.Sprintf("%v.%v", routing.ArmyMovesPrefix, userName),
+		fmt.Sprintf("%v.*", routing.ArmyMovesPrefix),
+		pubsub.Transient,
+		func(msg gamelogic.ArmyMove) pubsub.AckType {
+			outcome := ngs.HandleMove(msg)
+
+			switch outcome {
+			case gamelogic.MoveOutComeSafe, gamelogic.MoveOutcomeMakeWar:
+				return pubsub.Ack
+			case gamelogic.MoveOutcomeSamePlayer:
+				return pubsub.NackDiscard
+			default:
+				return pubsub.NackDiscard
+			}
 		},
 	)
 
@@ -141,11 +155,18 @@ loop:
 			}
 
 			// Validation passed. Make move
-			_, err = ngs.CommandMove(cmd)
+			cmdMove, err := ngs.CommandMove(cmd)
 			if err != nil {
 				fmt.Printf("Move failed: %v\n", err)
 				continue loop
 			}
+
+			err = pubsub.PublishJSON(
+				publishChan,
+				string(routing.ExchangePerilTopic),
+				fmt.Sprintf("%v.%v", routing.ArmyMovesPrefix, userName),
+				cmdMove,
+			)
 		case "status":
 			ngs.CommandStatus()
 			continue loop

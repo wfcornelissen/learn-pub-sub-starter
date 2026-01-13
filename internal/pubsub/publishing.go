@@ -4,24 +4,25 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
+	"log"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-type SimpleQueueType struct {
-	Durable   bool
-	Transient bool
-}
+type SimpleQueueType int
 
-func CreateQueueType(qtpe string) (SimpleQueueType, error) {
-	if strings.ToLower(qtpe) == "durable" {
-		return SimpleQueueType{Durable: true, Transient: false}, nil
-	} else if strings.ToLower(qtpe) == "transient" {
-		return SimpleQueueType{Durable: false, Transient: true}, nil
-	}
-	return SimpleQueueType{}, fmt.Errorf("Invalid type passed")
-}
+const (
+	Durable SimpleQueueType = iota
+	Transient
+)
+
+type AckType int
+
+const (
+	Ack AckType = iota
+	NackRequeue
+	NackDiscard
+)
 
 func PublishJSON[T any](ch *amqp.Channel, exchange, key string, val T) error {
 	byteVal, err := json.Marshal(val)
@@ -55,7 +56,7 @@ func DeclareAndBind(
 		return &amqp.Channel{}, amqp.Queue{}, fmt.Errorf("Error creating channel:\n%v\n", err)
 	}
 
-	queue, err := channel.QueueDeclare(queueName, queueType.Durable, queueType.Transient, queueType.Transient, false, nil)
+	queue, err := channel.QueueDeclare(queueName, queueType == Durable, queueType != Durable, queueType != Durable, false, nil)
 	if err != nil {
 		return &amqp.Channel{}, amqp.Queue{}, fmt.Errorf("Error creating queue:\n%v\n", err)
 
@@ -75,7 +76,7 @@ func SubscribeJSON[T any](
 	queueName,
 	key string,
 	queueType SimpleQueueType, // an enum to represent "durable" or "transient"
-	handler func(T),
+	handler func(T) AckType,
 ) error {
 	channel, _, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
 	if err != nil {
@@ -92,11 +93,33 @@ func SubscribeJSON[T any](
 			err := json.Unmarshal(delivery.Body, &msg)
 			if err != nil {
 				fmt.Printf("Error retrieving delivery structs:\n%v\n", err)
+				err = delivery.Nack(false, false)
+				if err != nil {
+					fmt.Printf("Failed to acknowledge delivery:\n%v\n", err)
+				}
+				log.Println("Nack Discard: message sent to discard queue")
+				continue
 			}
-			handler(msg)
-			err = delivery.Ack(false)
-			if err != nil {
-				fmt.Printf("Failed to acknowledge delivery:\n%v\n", err)
+			ack := handler(msg)
+			switch ack {
+			case Ack:
+				err = delivery.Ack(false)
+				if err != nil {
+					fmt.Printf("Failed to acknowledge delivery:\n%v\n", err)
+				}
+				log.Println("Ack: message processed successfully")
+			case NackRequeue:
+				err = delivery.Nack(false, true)
+				if err != nil {
+					fmt.Printf("Failed to acknowledge delivery:\n%v\n", err)
+				}
+				log.Println("Nack Requeue: message requeued")
+			case NackDiscard:
+				err = delivery.Nack(false, false)
+				if err != nil {
+					fmt.Printf("Failed to acknowledge delivery:\n%v\n", err)
+				}
+				log.Println("Nack Discard: message sent to discard queue")
 			}
 		}
 	}()

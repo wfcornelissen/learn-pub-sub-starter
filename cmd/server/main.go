@@ -35,7 +35,7 @@ func main() {
 		return
 	}
 
-	_, _, err = pubsub.DeclareAndBind(conn, routing.ExchangePerilDirect, "game_logs", "game_logs.*", pubsub.SimpleQueueType{Durable: true})
+	_, _, err = pubsub.DeclareAndBind(conn, routing.ExchangePerilDirect, "game_logs", "game_logs.*", pubsub.Durable)
 	if err != nil {
 		fmt.Printf("Failed to declare and bind queue:\n%v\n", err)
 		return
