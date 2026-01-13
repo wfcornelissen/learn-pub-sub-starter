@@ -4,6 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+
+	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
+	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
+	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type MoveOutcome int
@@ -32,6 +37,18 @@ func (gs *GameState) HandleMove(move ArmyMove) MoveOutcome {
 	overlappingLocation := getOverlappingLocation(player, move.Player)
 	if overlappingLocation != "" {
 		fmt.Printf("You have units in %s! You are at war with %s!\n", overlappingLocation, move.Player.Username)
+		err := pubsub.PublishJSON(
+			&amqp.Channel{},
+			routing.ExchangePerilTopic,
+			routing.WarRecognitionsPrefix+"."+player.Username,
+			gamelogic.RecognitionOfWar{
+				Attacker: move.Player,
+				Defender: gs.GetPlayerSnap(),
+			},
+		)
+		if err != nil {
+			return MoveOutcomeSamePlayer
+		}
 		return MoveOutcomeMakeWar
 	}
 	fmt.Printf("You are safe from %s's units.\n", move.Player.Username)

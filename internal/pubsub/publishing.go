@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -56,7 +57,16 @@ func DeclareAndBind(
 		return &amqp.Channel{}, amqp.Queue{}, fmt.Errorf("Error creating channel:\n%v\n", err)
 	}
 
-	queue, err := channel.QueueDeclare(queueName, queueType == Durable, queueType != Durable, queueType != Durable, false, nil)
+	queue, err := channel.QueueDeclare(
+		queueName,
+		queueType == Durable,
+		queueType != Durable,
+		queueType != Durable,
+		false,
+		amqp.Table{
+			"x-dead-letter-exchange": routing.ExchangePerilDlx,
+		},
+	)
 	if err != nil {
 		return &amqp.Channel{}, amqp.Queue{}, fmt.Errorf("Error creating queue:\n%v\n", err)
 
@@ -108,18 +118,21 @@ func SubscribeJSON[T any](
 					fmt.Printf("Failed to acknowledge delivery:\n%v\n", err)
 				}
 				log.Println("Ack: message processed successfully")
+				fmt.Println(">")
 			case NackRequeue:
 				err = delivery.Nack(false, true)
 				if err != nil {
 					fmt.Printf("Failed to acknowledge delivery:\n%v\n", err)
 				}
 				log.Println("Nack Requeue: message requeued")
+				fmt.Println(">")
 			case NackDiscard:
 				err = delivery.Nack(false, false)
 				if err != nil {
 					fmt.Printf("Failed to acknowledge delivery:\n%v\n", err)
 				}
 				log.Println("Nack Discard: message sent to discard queue")
+				fmt.Println(">")
 			}
 		}
 	}()
